@@ -10,7 +10,6 @@ demo = gr.TabbedInterface(
     apps,
     tab_names,
     title="IDBI MSME Risk Assessment",
-    theme=gr.themes.Soft(),
 )
 
 
