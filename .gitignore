@@ -1,0 +1,10 @@
+__pycache__/
+models/
+*.pkl
+*.egg-info/
+dist/
+.env
+venv/
+.serena/
+.sera*
+docs/

@@ -1,0 +1,7 @@
+gradio>=5.0,<6
+google-genai>=1.0
+lightgbm>=4.0
+shap>=0.40
+scikit-learn>=1.0
+joblib>=1.0
+pytest>=8
