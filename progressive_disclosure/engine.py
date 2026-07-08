@@ -92,12 +92,107 @@ def _fallback_response(field_defs):
     }
 
 
+def _rule_extract(user_text, field_defs):
+    import re
+    text = user_text.lower()
+    filled = {}
+    for f in field_defs:
+        key = f["key"]
+        if f["type"] not in ("str", "float", "int", "enum"):
+            continue
+        ftext = text
+        if key == "annual_turnover":
+            m = re.search(r'(?:turnover|revenue|income|sales|business|annual)\s*(?:of|:)?\s*(?:₹|rs\.?|inr)?\s*([\d,.]+)\s*((?:crore?|cr|lakh|l|k|thousand|million|m|billion))?', ftext)
+            if m:
+                num = float(m.group(1).replace(",", ""))
+                unit = (m.group(2) or "").lower().strip()
+                if unit in ("crore", "cr"): num *= 10000000
+                elif unit in ("lakh", "l"): num *= 100000
+                elif unit in ("thousand", "k"): num *= 1000
+                elif unit in ("million", "m"): num *= 1000000
+                elif unit in ("billion"): num *= 1000000000
+                filled[key] = num
+            continue
+        if key == "years_in_operation":
+            m = re.search(r'(\d+)\s*(?:years?|yrs?)', ftext)
+            if m:
+                filled[key] = int(m.group(1))
+            continue
+        if key == "credit_score":
+            m = re.search(r'(?:credit|ci?bil|score)\s*(?:score|is|:)?\s*(\d{3})', ftext)
+            if not m:
+                m = re.search(r'(\d{3})\s*(?:credit|ci?bil)', ftext)
+            if m:
+                filled[key] = int(m.group(1))
+            continue
+        if key == "existing_loan_amount":
+            m = re.search(r'(?:existing\s+)?loan\s*(?:amount|of|:)?\s*(?:₹|rs\.?|inr|usd?\$?)?\s*([\d,.]+)\s*(?:k|thousand|lakh|l|cr|crore)?', ftext)
+            if m:
+                filled[key] = float(m.group(1).replace(",", ""))
+            continue
+        if key == "sector":
+            sectors_ml = {"manufactur": "Manufacturing", "textile": "Manufacturing", "factory": "Manufacturing",
+                          "service": "Services", "consult": "Services", "retail": "Retail", "shop": "Retail",
+                          "store": "Retail", "bakery": "Retail", "restaurant": "Retail",
+                          "agriculture": "Agriculture", "farm": "Agriculture",
+                          "construction": "Construction", "build": "Construction",
+                          "it": "IT/Technology", "tech": "IT/Technology", "software": "IT/Technology"}
+            for kw, v in sectors_ml.items():
+                if kw in ftext:
+                    filled[key] = v
+                    break
+            continue
+        if key == "business_type":
+            types_ml = {"sole proprietor": "Sole Proprietorship", "proprietorship": "Sole Proprietorship",
+                        "partnership": "Partnership", "private limited": "Private Limited", "pvt ltd": "Private Limited",
+                        "llp": "LLP", "limited liability": "LLP", "public limited": "Public Limited"}
+            for kw, v in types_ml.items():
+                if kw in ftext:
+                    filled[key] = v
+                    break
+            continue
+        if key == "gst_filing_consistency":
+            if any(w in ftext for w in ("not regist", "unregist", "no gst")):
+                filled[key] = "Not registered"
+            elif any(w in ftext for w in ("new regist", "just regist")):
+                filled[key] = "New registrant"
+            elif any(w in ftext for w in ("irregular", "sometimes", "occasional")):
+                filled[key] = "Irregular"
+            elif any(w in ftext for w in ("regular", "monthly", "timely")):
+                filled[key] = "Regular (monthly)"
+            continue
+        if key == "avg_days_late":
+            m = re.search(r'(\d+)\s*(?:days?\s+late|days?\s+overdue)', ftext)
+            if m:
+                filled[key] = int(m.group(1))
+            continue
+        if key == "supplier_count":
+            m = re.search(r'(\d+)\s*(?:supplier|vendor)', ftext)
+            if m:
+                filled[key] = int(m.group(1))
+            continue
+        if key == "buyer_concentration":
+            m = re.search(r'(\d+)\s*(?:customer|buyer|client)', ftext)
+            if m:
+                filled[key] = min(0.9, int(m.group(1)) * 0.1)
+            continue
+    return filled
+
+
 def process_llm_input(user_text, current_state, field_defs):
     if not user_text.strip():
         return _fallback_response(field_defs)
 
     if len(user_text) > 2000:
         user_text = user_text[:2000]
+
+    rule_filled = _rule_extract(user_text, field_defs)
+    if rule_filled:
+        missing = [f["key"] for f in field_defs if f["key"] not in {**current_state, **rule_filled} and f["required"]]
+        filled_names = ", ".join(rule_filled.keys())
+        summary = f"Got: {filled_names}. Still need: {len(missing)} field(s)."
+        next_q = f"Thanks! I noted {filled_names}. " + (f"What is your {missing[0]}?" if missing else "All set!")
+        return {"filled_fields": rule_filled, "missing_fields": missing, "next_question": next_q, "summary": summary}
 
     system_prompt, user_prompt = _build_prompt(user_text, current_state, field_defs)
 

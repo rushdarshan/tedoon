@@ -269,6 +269,9 @@ def respond(message, history, state):
             return "", history, html, state
 
     if phase == "active" and not field_reveal:
+        next_batch = compute_next_batch(field_defs, form_state, field_reveal)
+        for key in next_batch:
+            field_state_transition(field_reveal, key, "ASKING")
         types_text = ""
         for f in field_defs:
             opts = f" ({', '.join(f['options'])})" if f.get("options") else ""
@@ -281,6 +284,7 @@ def respond(message, history, state):
         )
         history.append({"role": "assistant", "content": greeting})
         html = _render_form_html(field_defs, form_state, field_reveal, "active", "")
+        state["field_reveal"] = field_reveal
         return "", history, html, state
 
     result = process_llm_input(user_msg, form_state, field_defs)
