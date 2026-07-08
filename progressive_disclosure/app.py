@@ -329,7 +329,7 @@ def create_app(tab_name="PD"):
         gr.Markdown(f"# 🏦 IDBI MSME Risk Assessment — {tab_name}")
         gr.Markdown("⚠️ Session data is not saved. Do not close this tab.")
 
-        chatbot = gr.Chatbot(label="Conversation", height=420, type="messages")
+        chatbot = gr.Chatbot(label="Conversation", height=420)
         msg = gr.Textbox(
             label="Your message",
             placeholder="Describe your business or answer the question...",
