@@ -1,17 +1,3 @@
----
-title: Tedoon
-emoji: 🏃
-colorFrom: purple
-colorTo: green
-sdk: gradio
-sdk_version: 6.20.0
-python_version: '3.12'
-app_file: app.py
-pinned: false
-license: mit
-short_description: MSME credit risk — ensemble PD, competing risks Cox, cascade contagion, fair lending auditscade contagion
----
-
 # Tedoon — IDBI MSME Risk Assessment
 
 **IDBI Innovate 2026 — Track 04 entry.** End-to-end MSME credit risk pipeline: fuzzy input → risk decision in ~1 second.
