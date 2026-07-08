@@ -1,7 +1,9 @@
-gradio>=5.0,<6
+gradio>=5.0
 google-genai>=1.0
 lightgbm>=4.0
 shap>=0.40
 scikit-learn>=1.0
 joblib>=1.0
+dowhy>=0.14
+lifelines>=0.30
 pytest>=8
