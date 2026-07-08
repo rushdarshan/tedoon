@@ -105,6 +105,20 @@ def _render_form_html(field_defs, form_state, field_reveal, phase, progress_text
             dir_icon = "✅" if cal["post_ece"] < 0.05 else "⚠️"
             cal_badge = f'<span style="font-size:10px;color:#888;margin-left:8px;">{dir_icon} Cal: Brier={cal["post_brier"]:.4f} ECE={cal["post_ece"]:.4f} T={cal["T_optimal"]:.2f}</span>'
 
+        cr = results.get("competing_risks", {})
+        cif12 = cr.get("summary", {}).get("12m", {})
+        cr_html = ""
+        if cif12:
+            d, e, r_, tot = cif12.get("default", 0), cif12.get("voluntary_exit", 0), cif12.get("restructure", 0), cif12.get("total_event", 0)
+            cr_html = ("<div class=\"results-box\" style=\"border-color:#7b1fa2;margin-top:8px;\">"
+                       "<h4 style=\"margin:0 0 4px 0;font-size:13px;\">Competing Risks (12-month CIF)</h4>"
+                       "<table style=\"width:100%;font-size:12px;\">"
+                       f"<tr><td>P(Default)</td><td style=\"font-weight:600;color:#e53935;\">{d:.1f}%</td></tr>"
+                       f"<tr><td>P(Voluntary Exit)</td><td style=\"font-weight:600;color:#fb8c00;\">{e:.1f}%</td></tr>"
+                       f"<tr><td>P(Restructure)</td><td style=\"font-weight:600;color:#1565c0;\">{r_:.1f}%</td></tr>"
+                       f"<tr><td>Total Event Risk</td><td style=\"font-weight:600;\">{tot:.1f}%</td></tr>"
+                       "</table></div>")
+
         results_html = f"""
         <div style="margin-top:8px;">
             <div style="display:flex; gap:12px; margin-bottom:8px;">
@@ -156,20 +170,7 @@ def _render_form_html(field_defs, form_state, field_reveal, phase, progress_text
                         </div>
                     </div>
                 </div>
-                cr = results.get("competing_risks", {})
-                cr_html = ""
-                cif12 = cr.get("summary", {}).get("12m", {})
-                if cif12:
-                    cr_html = f"""
-                    <div class="results-box" style="border-color:#7b1fa2;margin-top:8px;">
-                        <h4 style="margin:0 0 4px 0;font-size:13px;">Competing Risks (12-month CIF)</h4>
-                        <table style="width:100%;font-size:12px;">
-                            <tr><td>P(Default)</td><td style="font-weight:600;color:#e53935;">{cif12['default']:.1f}%</td></tr>
-                            <tr><td>P(Voluntary Exit)</td><td style="font-weight:600;color:#fb8c00;">{cif12['voluntary_exit']:.1f}%</td></tr>
-                            <tr><td>P(Restructure)</td><td style="font-weight:600;color:#1565c0;">{cif12['restructure']:.1f}%</td></tr>
-                            <tr><td>Total Event Risk</td><td style="font-weight:600;">{cif12['total_event']:.1f}%</td></tr>
-                        </table>
-                    </div>"""
+                {cr_html}
                 {stages_html}
                 {cal_badge}
             </div>"""
