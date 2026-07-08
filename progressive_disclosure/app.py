@@ -201,9 +201,14 @@ def sorted_fields_from_defs(field_defs):
 
 
 def _build_initial_state(tab_name):
+    field_defs = TAB_FIELDS.get(tab_name, [])
+    field_reveal = {}
+    next_batch = compute_next_batch(field_defs, {}, field_reveal)
+    for key in next_batch:
+        field_state_transition(field_reveal, key, "ASKING")
     return {
         "form_state": {},
-        "field_reveal": {},
+        "field_reveal": field_reveal,
         "phase": "active",
         "tab_name": tab_name,
         "summary": "",
@@ -268,25 +273,6 @@ def respond(message, history, state):
             html = _render_form_html(field_defs, form_state, field_reveal, "confirming", "")
             return "", history, html, state
 
-    if phase == "active" and not field_reveal:
-        next_batch = compute_next_batch(field_defs, form_state, field_reveal)
-        for key in next_batch:
-            field_state_transition(field_reveal, key, "ASKING")
-        types_text = ""
-        for f in field_defs:
-            opts = f" ({', '.join(f['options'])})" if f.get("options") else ""
-            types_text += f"  - {f['label']}{' *' if f['required'] else ''}{opts}\n"
-        greeting = (
-            "Welcome! Tell me about your business and I'll help fill out the form. "
-            "For example: *'MSME in textiles with ₹50L annual turnover, been in business 8 years.'*\n\n"
-            "I need the following information:\n"
-            f"{types_text}"
-        )
-        history.append({"role": "assistant", "content": greeting})
-        html = _render_form_html(field_defs, form_state, field_reveal, "active", "")
-        state["field_reveal"] = field_reveal
-        return "", history, html, state
-
     result = process_llm_input(user_msg, form_state, field_defs)
 
     for k, v in result.get("filled_fields", {}).items():
@@ -322,18 +308,49 @@ def respond(message, history, state):
 
 def reset_fn(state):
     tab_name = state.get("tab_name", "PD")
-    return [], _build_initial_state(tab_name), _render_form_html(TAB_FIELDS.get(tab_name, []), {}, {}, "active", "")
+    field_defs = TAB_FIELDS.get(tab_name, [])
+    fresh = _build_initial_state(tab_name)
+    revealed = fresh["field_reveal"]
+    types_text = ""
+    for f in field_defs:
+        opts = f" ({', '.join(f['options'])})" if f.get("options") else ""
+        types_text += f"  - {f['label']}{' *' if f['required'] else ''}{opts}\n"
+    welcome_msg = (
+        "Welcome! Tell me about your business and I'll help fill out the form. "
+        "For example: *'MSME in textiles with ₹50L annual turnover, been in business 8 years.'*\n\n"
+        "I need the following information:\n"
+        f"{types_text}"
+    )
+    history = [{"role": "assistant", "content": welcome_msg}]
+    html = _render_form_html(field_defs, {}, revealed, "active", "")
+    return history, fresh, html
 
 
 def create_app(tab_name="PD"):
     field_defs = TAB_FIELDS.get(tab_name, [])
     initial_state = _build_initial_state(tab_name)
 
+    types_text = ""
+    for f in field_defs:
+        opts = f" ({', '.join(f['options'])})" if f.get("options") else ""
+        types_text += f"  - {f['label']}{' *' if f['required'] else ''}{opts}\n"
+    welcome_msg = (
+        "Welcome! Tell me about your business and I'll help fill out the form. "
+        "For example: *'MSME in textiles with ₹50L annual turnover, been in business 8 years.'*\n\n"
+        "I need the following information:\n"
+        f"{types_text}"
+    )
+
+    revealed = initial_state["field_reveal"]
+
     with gr.Blocks(title=f"IDBI Risk Assessment — {tab_name}") as app:
         gr.Markdown(f"# 🏦 IDBI MSME Risk Assessment — {tab_name}")
         gr.Markdown("⚠️ Session data is not saved. Do not close this tab.")
 
-        chatbot = gr.Chatbot(label="Conversation", height=420)
+        chatbot = gr.Chatbot(
+            label="Conversation", height=420,
+            value=[{"role": "assistant", "content": welcome_msg}],
+        )
         msg = gr.Textbox(
             label="Your message",
             placeholder="Describe your business or answer the question...",
@@ -344,7 +361,7 @@ def create_app(tab_name="PD"):
             reset_btn = gr.Button("Reset", variant="secondary", scale=1)
 
         form_display = gr.HTML(
-            value=_render_form_html(field_defs, {}, {}, "active", ""),
+            value=_render_form_html(field_defs, {}, revealed, "active", ""),
         )
 
         state = gr.State(initial_state)

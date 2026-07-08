@@ -102,16 +102,31 @@ def _rule_extract(user_text, field_defs):
             continue
         ftext = text
         if key == "annual_turnover":
-            m = re.search(r'(?:turnover|revenue|income|sales|business|annual)\s*(?:of|:)?\s*(?:₹|rs\.?|inr)?\s*([\d,.]+)\s*((?:crore?|cr|lakh|l|k|thousand|million|m|billion))?', ftext)
-            if m:
-                num = float(m.group(1).replace(",", ""))
-                unit = (m.group(2) or "").lower().strip()
-                if unit in ("crore", "cr"): num *= 10000000
-                elif unit in ("lakh", "l"): num *= 100000
-                elif unit in ("thousand", "k"): num *= 1000
-                elif unit in ("million", "m"): num *= 1000000
-                elif unit in ("billion"): num *= 1000000000
-                filled[key] = num
+            _NUM = r'([\d,.]+)'
+            _UNIT = r'((?:crore?|cr|lakh|l|k|thousand|million|m|billion))'
+            _KW = r'(?:turnover|revenue|income|sales|annual)'
+            _AMT = r'(?:₹|rs\.?|inr)?'
+            m = None
+            # Pattern A: "₹50L" or "2 crore" with turnover nearby (amount[ unit] kw?)
+            for pat in [
+                rf'(?:^|[\s,;]){_AMT}\s*{_NUM}\s*{_UNIT}?(?:\s*{_KW})?',
+                rf'(?:^|[\s,;]){_NUM}\s*{_UNIT}\s*{_KW}',
+                rf'{_KW}\s*(?:of|:)?\s*{_AMT}\s*{_NUM}\s*{_UNIT}?',
+            ]:
+                m = re.search(pat, ftext)
+                if m:
+                    g1 = m.group(1)
+                    g2 = m.group(2) if m.lastindex and m.lastindex >= 2 else None
+                    if g1:
+                        num = float(g1.replace(",", ""))
+                        unit = (g2 or "").lower().strip()
+                        if unit in ("crore", "cr"): num *= 10000000
+                        elif unit in ("lakh", "l"): num *= 100000
+                        elif unit in ("thousand", "k"): num *= 1000
+                        elif unit in ("million", "m"): num *= 1000000
+                        elif unit in ("billion"): num *= 1000000000
+                        filled[key] = num
+                        break
             continue
         if key == "years_in_operation":
             m = re.search(r'(\d+)\s*(?:years?|yrs?)', ftext)
